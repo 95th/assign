@@ -8,50 +8,63 @@ public class Hungarian {
     private static final byte MARK_COL = 1;
     private static final byte MARK_BOTH = 2;
 
-    private double[][] original_values;
+    private double[][] originalValues;
     private double[][] values;
 
     private byte[][] lines;
-    private int line_count;
+    private int lineCount;
 
-    private boolean[] marked_rows;
-    private boolean[] marked_cols;
+    private boolean[] markedRows;
+    private boolean[] markedCols;
 
-    private boolean[] occupied_cols;
+    private boolean[] occupiedCols;
     private int[] rows;
 
-    private int row_count;
+    private int rowCount;
     private int size;
 
-    public void set_size(int rows, int cols) {
-        this.row_count = rows;
+    public void setMatrixSize(int rows, int cols) {
+        this.rowCount = rows;
         this.size = Math.max(rows, cols);
-        ensure_capacity();
+        ensureCapacity();
     }
 
-    public void set_value(int row, int col, double value) {
-        original_values[row][col] = value;
+    public void setCell(int row, int col, double value) {
+        originalValues[row][col] = value;
         values[row][col] = value;
     }
 
     public void reduce() {
-        subtract_row_max();
-        subtract_col_max();
+        subtractRowMax();
+        subtractColMax();
 
-        cover_zeros();
-        while (line_count != size) {
-            create_additional_zeros();
-            cover_zeros();
+        coverZeros();
+        while (lineCount != size) {
+            createAdditionalZeros();
+            coverZeros();
         }
 
         optimization();
     }
 
-    public int[] get_result() {
-        return Arrays.copyOf(rows, row_count);
+    public int[] getResult() {
+        return Arrays.copyOf(rows, rowCount);
     }
 
-    private void subtract_row_max() {
+    public double maximumAverage() {
+        if (rowCount == 0) {
+            return 0;
+        }
+
+        double total = 0;
+        for (int row = 0; row < rowCount; row++) {
+            total += originalValues[row][rows[row]];
+        }
+
+        return total / rowCount;
+    }
+
+    private void subtractRowMax() {
         for (int r = 0; r < size; r++) {
             double max = Double.NEGATIVE_INFINITY;
             for (int c = 0; c < size; c++) {
@@ -66,7 +79,7 @@ public class Hungarian {
         }
     }
 
-    private void subtract_col_max() {
+    private void subtractColMax() {
         for (int c = 0; c < size; c++) {
             double max = Double.NEGATIVE_INFINITY;
             for (int r = 0; r < size; r++) {
@@ -81,42 +94,43 @@ public class Hungarian {
         }
     }
 
-    private void cover_zeros() {
-        try_assignment();
+    private void coverZeros() {
+        tryAssignment();
 
-        Arrays.fill(marked_rows, 0, size, false);
-        Arrays.fill(marked_cols, 0, size, false);
+        Arrays.fill(markedRows, 0, size, false);
+        Arrays.fill(markedCols, 0, size, false);
 
         for (int r = 0; r < size; r++) {
             if (rows[r] == -1) {
-                mark_row(r);
+                markRow(r);
             }
         }
 
-        line_count = invert_row_marks();
+        lineCount = invertRowMarks();
     }
 
-    private void try_assignment() {
+    private void tryAssignment() {
         Arrays.fill(rows, 0, size, -1);
-        Arrays.fill(occupied_cols, 0, size, false);
+        Arrays.fill(occupiedCols, 0, size, false);
+        clear(lines);
 
         for (int r = 0; r < size; r++) {
             for (int c = 0; c < size; c++) {
-                if (values[r][c] == 0 && !occupied_cols[c]) {
+                if (values[r][c] == 0 && !occupiedCols[c]) {
                     rows[r] = c;
-                    occupied_cols[c] = true;
+                    occupiedCols[c] = true;
                     break;
                 }
             }
         }
     }
 
-    private void mark_row(int row) {
-        if (marked_rows[row]) {
+    private void markRow(int row) {
+        if (markedRows[row]) {
             return;
         }
 
-        marked_rows[row] = true;
+        markedRows[row] = true;
 
         for (int col = 0; col < size; col++) {
             byte mark = lines[row][col];
@@ -129,17 +143,17 @@ public class Hungarian {
 
         for (int col = 0; col < size; col++) {
             if (values[row][col] == 0) {
-                mark_column(col);
+                markColumn(col);
             }
         }
     }
 
-    private void mark_column(int col) {
-        if (marked_cols[col]) {
+    private void markColumn(int col) {
+        if (markedCols[col]) {
             return;
         }
 
-        marked_cols[col] = true;
+        markedCols[col] = true;
 
         for (int row = 0; row < size; row++) {
             byte mark = lines[row][col];
@@ -152,12 +166,12 @@ public class Hungarian {
 
         for (int row = 0; row < size; row++) {
             if (rows[row] == col) {
-                mark_row(row);
+                markRow(row);
             }
         }
     }
 
-    private int invert_row_marks() {
+    private int invertRowMarks() {
         int count = 0;
         for (int row = 0; row < size; row++) {
             for (int col = 0; col < size; col++) {
@@ -175,6 +189,8 @@ public class Hungarian {
                     case MARK_BOTH:
                         lines[row][col] = MARK_COL;
                         break;
+                    default:
+                        break;
                 }
                 if (row == col) {
                     count += Math.abs(lines[row][col]);
@@ -184,8 +200,8 @@ public class Hungarian {
         return count;
     }
 
-    private void create_additional_zeros() {
-        double max_uncovered_val = Double.NEGATIVE_INFINITY;
+    private void createAdditionalZeros() { // NOSONAR
+        double maxUncoveredVal = Double.NEGATIVE_INFINITY;
         for (int row = 0; row < size; row++) {
             for (int col = 0; col < size; col++) {
                 if (lines[row][col] != UNMARKED) {
@@ -193,8 +209,8 @@ public class Hungarian {
                 }
 
                 double val = values[row][col];
-                if (max_uncovered_val < val) {
-                    max_uncovered_val = val;
+                if (maxUncoveredVal < val) {
+                    maxUncoveredVal = val;
                 }
             }
         }
@@ -203,9 +219,9 @@ public class Hungarian {
             for (int col = 0; col < size; col++) {
                 byte mark = lines[row][col];
                 if (mark == UNMARKED) {
-                    values[row][col] -= max_uncovered_val;
+                    values[row][col] -= maxUncoveredVal;
                 } else if (mark == MARK_BOTH) {
-                    values[row][col] += max_uncovered_val;
+                    values[row][col] += maxUncoveredVal;
                 }
             }
         }
@@ -213,7 +229,7 @@ public class Hungarian {
 
     private void optimization() {
         Arrays.fill(rows, 0, size, -1);
-        Arrays.fill(occupied_cols, 0, size, false);
+        Arrays.fill(occupiedCols, 0, size, false);
         optimization(0);
     }
 
@@ -223,38 +239,46 @@ public class Hungarian {
         }
 
         for (int col = 0; col < size; col++) {
-            if (values[row][col] == 0 && !occupied_cols[col]) {
+            if (values[row][col] == 0 && !occupiedCols[col]) {
                 rows[row] = col;
-                occupied_cols[col] = true;
+                occupiedCols[col] = true;
                 if (optimization(row + 1)) {
                     return true;
                 }
-                occupied_cols[col] = false;
+                occupiedCols[col] = false;
             }
         }
 
         return false;
     }
 
-    private void ensure_capacity() {
-        if (original_values == null || original_values.length < size) {
-            int old_length = original_values == null ? 0 : original_values.length;
-            int new_length = Math.max(size, old_length * 2);
+    private void ensureCapacity() {
+        if (originalValues == null || originalValues.length < size) {
+            int oldLength = originalValues == null ? 0 : originalValues.length;
+            int newLength = Math.max(size, oldLength * 2);
 
-            original_values = new double[new_length][new_length];
-            values = new double[new_length][new_length];
-            lines = new byte[new_length][new_length];
-            marked_rows = new boolean[new_length];
-            marked_cols = new boolean[new_length];
-            occupied_cols = new boolean[new_length];
-            rows = new int[new_length];
+            originalValues = new double[newLength][newLength];
+            values = new double[newLength][newLength];
+            lines = new byte[newLength][newLength];
+            markedRows = new boolean[newLength];
+            markedCols = new boolean[newLength];
+            occupiedCols = new boolean[newLength];
+            rows = new int[newLength];
         } else {
-            clear(original_values);
+            clear(originalValues);
             clear(values);
         }
     }
 
     private void clear(double[][] arr) {
+        for (int r = 0; r < size; r++) {
+            for (int c = 0; c < size; c++) {
+                arr[r][c] = 0;
+            }
+        }
+    }
+
+    private void clear(byte[][] arr) {
         for (int r = 0; r < size; r++) {
             for (int c = 0; c < size; c++) {
                 arr[r][c] = 0;
