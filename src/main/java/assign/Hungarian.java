@@ -99,6 +99,7 @@ public class Hungarian {
 
         Arrays.fill(markedRows, 0, size, false);
         Arrays.fill(markedCols, 0, size, false);
+        clear(lines);
 
         for (int r = 0; r < size; r++) {
             if (rows[r] == -1) {
@@ -112,7 +113,6 @@ public class Hungarian {
     private void tryAssignment() {
         Arrays.fill(rows, 0, size, -1);
         Arrays.fill(occupiedCols, 0, size, false);
-        clear(lines);
 
         for (int r = 0; r < size; r++) {
             for (int c = 0; c < size; c++) {
