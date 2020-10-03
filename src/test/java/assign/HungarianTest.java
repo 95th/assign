@@ -22,29 +22,43 @@ class HungarianTest {
 
     @Test
     void test_01() {
-        double[][] matrix = { { 1, 2, 3 }, { 5, 1, 7 }, { 1, 1, 0 } };
-        int[] expected = { 1, 2, 0 };
+        double[][] matrix = {{1, 2, 3}, {5, 1, 7}, {1, 1, 0}};
+        int[] expected = {1, 2, 0};
         run_test(3, 3, matrix, expected);
     }
 
     @Test
     void test_02() {
-        double[][] matrix = { { 0, 0, 0 }, { 1, 0, 0 }, { 1, 0, 1 } };
-        int[] expected = { 1, 0, 2 };
+        double[][] matrix = {{0, 0, 0}, {1, 0, 0}, {1, 0, 1}};
+        int[] expected = {1, 0, 2};
         run_test(3, 3, matrix, expected);
     }
 
     @Test
     void test_03() {
-        double[][] matrix = { { 0, 0, 0 }, { 1, 0, 0 }, { 1, 0, 0 } };
-        int[] expected = { 1, 0, 2 };
+        double[][] matrix = {{0, 0, 0}, {1, 0, 0}, {1, 0, 0}};
+        int[] expected = {1, 0, 2};
         run_test(3, 3, matrix, expected);
     }
 
     @Test
     void test_04() {
-        double[][] matrix = { { 0, 0, 0, 0, 0, 0 }, { 0.42, 0, 0, 0, 0, 0 }, { 0.41, 0, 0, 0, 0, 0 } };
-        int[] expected = { 1, 0, 2 };
+        double[][] matrix = {{0, 0, 0, 0, 0, 0}, {0.42, 0, 0, 0, 0, 0}, {0.41, 0, 0, 0, 0, 0}};
+        int[] expected = {1, 0, 2};
         run_test(3, 6, matrix, expected);
+    }
+
+    @Test
+    void test_05() {
+        double[][] matrix = {{0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 1}};
+        int[] expected = {0, 1, 5};
+        run_test(3, 6, matrix, expected);
+    }
+
+    @Test
+    void test_06() {
+        double[][] matrix = {{1, 2, 1}, {5, 4, 3}, {1, 1, 2}};
+        int[] expected = {1, 0, 2};
+        run_test(3, 3, matrix, expected);
     }
 }
