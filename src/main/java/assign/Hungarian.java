@@ -101,6 +101,12 @@ public class Hungarian {
         Arrays.fill(markedCols, 0, size, false);
         clear(lines);
 
+        // System.out.println("Initially values:");
+        // printValues();
+
+        // System.out.println("Initially lines:");
+        // printLines();
+
         for (int r = 0; r < size; r++) {
             if (rows[r] == -1) {
                 markRow(r);
@@ -108,18 +114,60 @@ public class Hungarian {
         }
 
         lineCount = invertRowMarks();
+
+        // System.out.println("Invert lines:");
+        // printLines();
     }
 
     private void tryAssignment() {
         Arrays.fill(rows, 0, size, -1);
         Arrays.fill(occupiedCols, 0, size, false);
 
-        for (int r = 0; r < size; r++) {
-            for (int c = 0; c < size; c++) {
-                if (values[r][c] == 0 && !occupiedCols[c]) {
-                    rows[r] = c;
-                    occupiedCols[c] = true;
-                    break;
+        int limit = 0;
+        int count = 0;
+        while (count < size && limit < size) {
+            limit++;
+            for (int row = 0; row < size; row++) {
+                int lastCol = -1;
+                int zeros = 0;
+                for (int col = 0; col < size; col++) {
+                    if (values[row][col] == 0 && !occupiedCols[col]) {
+                        zeros++;
+                        if (zeros > limit) {
+                            break;
+                        }
+                        lastCol = col;
+                    }
+                }
+
+                if (lastCol != -1 && zeros <= limit) {
+                    rows[row] = lastCol;
+                    occupiedCols[lastCol] = true;
+                    count++;
+                }
+            }
+
+            for (int col = 0; col < size; col++) {
+                if (occupiedCols[col]) {
+                    continue;
+                }
+
+                int lastRow = -1;
+                int zeros = 0;
+                for (int row = 0; row < size; row++) {
+                    if (values[row][col] == 0 && rows[row] != -1) {
+                        zeros++;
+                        if (zeros > limit) {
+                            break;
+                        }
+                        lastRow = row;
+                    }
+                }
+
+                if (lastRow != -1 && zeros <= limit) {
+                    rows[lastRow] = col;
+                    occupiedCols[col] = true;
+                    count++;
                 }
             }
         }
@@ -140,6 +188,9 @@ public class Hungarian {
                 lines[row][col] = MARK_ROW;
             }
         }
+
+        // System.out.println("Marking row: " + row);
+        // printLines();
 
         for (int col = 0; col < size; col++) {
             if (values[row][col] == 0) {
@@ -163,6 +214,9 @@ public class Hungarian {
                 lines[row][col] = MARK_COL;
             }
         }
+
+        // System.out.println("Marking column: " + col);
+        // printLines();
 
         for (int row = 0; row < size; row++) {
             if (rows[row] == col) {
@@ -285,4 +339,24 @@ public class Hungarian {
             }
         }
     }
+
+    // private void printLines() {
+    // for (int row = 0; row < size; row++) {
+    // for (int col = 0; col < size; col++) {
+    // System.out.printf("% 1d | ", lines[row][col]);
+    // }
+    // System.out.println();
+    // }
+    // System.out.println();
+    // }
+
+    // private void printValues() {
+    // for (int row = 0; row < size; row++) {
+    // for (int col = 0; col < size; col++) {
+    // System.out.printf("% 1.3f | ", values[row][col]);
+    // }
+    // System.out.println();
+    // }
+    // System.out.println();
+    // }
 }
