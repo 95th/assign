@@ -8,6 +8,8 @@ public class Hungarian {
     private static final byte MARK_COL = 1;
     private static final byte MARK_BOTH = 2;
 
+    private final boolean maximize;
+
     private double[][] originalValues;
     private double[][] values;
 
@@ -23,6 +25,10 @@ public class Hungarian {
     private int rowCount;
     private int size;
 
+    public Hungarian(boolean maximize) {
+        this.maximize = maximize;
+    }
+
     public void setMatrixSize(int rows, int cols) {
         this.rowCount = rows;
         this.size = Math.max(rows, cols);
@@ -31,12 +37,12 @@ public class Hungarian {
 
     public void setCell(int row, int col, double value) {
         originalValues[row][col] = value;
-        values[row][col] = value;
+        values[row][col] = maximize ? -value : value;
     }
 
     public void reduce() {
-        subtractRowMax();
-        subtractColMax();
+        subtractRowMin();
+        subtractColMin();
 
         coverZeros();
         while (lineCount != size) {
@@ -64,32 +70,32 @@ public class Hungarian {
         return total / rowCount;
     }
 
-    private void subtractRowMax() {
+    private void subtractRowMin() {
         for (int r = 0; r < size; r++) {
-            double max = Double.NEGATIVE_INFINITY;
+            double min = Double.POSITIVE_INFINITY;
             for (int c = 0; c < size; c++) {
                 double val = values[r][c];
-                if (max < val) {
-                    max = val;
+                if (min > val) {
+                    min = val;
                 }
             }
             for (int c = 0; c < size; c++) {
-                values[r][c] -= max;
+                values[r][c] -= min;
             }
         }
     }
 
-    private void subtractColMax() {
+    private void subtractColMin() {
         for (int c = 0; c < size; c++) {
-            double max = Double.NEGATIVE_INFINITY;
+            double min = Double.POSITIVE_INFINITY;
             for (int r = 0; r < size; r++) {
                 double val = values[r][c];
-                if (max < val) {
-                    max = val;
+                if (min > val) {
+                    min = val;
                 }
             }
             for (int r = 0; r < size; r++) {
-                values[r][c] -= max;
+                values[r][c] -= min;
             }
         }
     }
@@ -255,7 +261,7 @@ public class Hungarian {
     }
 
     private void createAdditionalZeros() { // NOSONAR
-        double maxUncoveredVal = Double.NEGATIVE_INFINITY;
+        double minUncoveredVal = Double.POSITIVE_INFINITY;
         for (int row = 0; row < size; row++) {
             for (int col = 0; col < size; col++) {
                 if (lines[row][col] != UNMARKED) {
@@ -263,8 +269,8 @@ public class Hungarian {
                 }
 
                 double val = values[row][col];
-                if (maxUncoveredVal < val) {
-                    maxUncoveredVal = val;
+                if (minUncoveredVal > val) {
+                    minUncoveredVal = val;
                 }
             }
         }
@@ -273,9 +279,9 @@ public class Hungarian {
             for (int col = 0; col < size; col++) {
                 byte mark = lines[row][col];
                 if (mark == UNMARKED) {
-                    values[row][col] -= maxUncoveredVal;
+                    values[row][col] -= minUncoveredVal;
                 } else if (mark == MARK_BOTH) {
-                    values[row][col] += maxUncoveredVal;
+                    values[row][col] += minUncoveredVal;
                 }
             }
         }
