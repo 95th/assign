@@ -134,6 +134,10 @@ public class Hungarian {
         while (count < size && limit < size) {
             limit++;
             for (int row = 0; row < size; row++) {
+                if (rows[row] != -1) {
+                    continue;
+                }
+
                 int lastCol = -1;
                 int zeros = 0;
                 for (int col = 0; col < size; col++) {
@@ -161,7 +165,7 @@ public class Hungarian {
                 int lastRow = -1;
                 int zeros = 0;
                 for (int row = 0; row < size; row++) {
-                    if (values[row][col] == 0 && rows[row] != -1) {
+                    if (values[row][col] == 0 && rows[row] == -1) {
                         zeros++;
                         if (zeros > limit) {
                             break;
