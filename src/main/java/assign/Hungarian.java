@@ -306,9 +306,13 @@ public class Hungarian {
             if (values[row][col] == 0 && !occupiedCols[col]) {
                 rows[row] = col;
                 occupiedCols[col] = true;
+
                 if (optimization(row + 1)) {
                     return true;
                 }
+
+                // Didn't pan out. Revert the assignment
+                rows[row] = -1;
                 occupiedCols[col] = false;
             }
         }
