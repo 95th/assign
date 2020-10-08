@@ -240,7 +240,7 @@ public class Hungarian {
                 done = true;
             }
             if (!done) {
-                findPrimeInRow(path[pathCount - 1][0]);
+                findPrimeInRow(path[pathCount][0]);
                 pathCount++;
                 path[pathCount][0] = path[pathCount - 1][0];
                 path[pathCount][1] = col;
@@ -393,22 +393,13 @@ public class Hungarian {
             mask = new byte[newLength][newLength];
             rowCover = new int[newLength];
             colCover = new int[newLength];
-            path = new int[newLength * newLength][2];
+            path = new int[newLength * 2][2];
         } else {
             clear(originalCost);
             clear(cost);
             clear(mask);
-            clear(path);
-            clear(rowCover);
-            clear(colCover);
-        }
-    }
-
-    private void clear(int[][] arr) {
-        for (int r = 0; r < size; r++) {
-            for (int c = 0; c < size; c++) {
-                arr[r][c] = 0;
-            }
+            clear(path, size * 2, 2);
+            clearCovers();
         }
     }
 
@@ -428,9 +419,11 @@ public class Hungarian {
         }
     }
 
-    private void clear(int[] arr) {
-        for (int i = 0; i < size; i++) {
-            arr[i] = 0;
+    private void clear(int[][] arr, int rows, int cols) {
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                arr[r][c] = 0;
+            }
         }
     }
 }
