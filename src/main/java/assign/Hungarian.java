@@ -2,339 +2,409 @@ package assign;
 
 import java.util.Arrays;
 
+/**
+ * Java implementation of https://github.com/bmc/munkres/blob/master/munkres.py
+ * 
+ * The Munkres module provides an implementation of the Munkres algorithm (also
+ * called the Hungarian algorithm or the Kuhn-Munkres algorithm), useful for
+ * solving the Assignment Problem.
+ * 
+ * For complete usage documentation, see: https://software.clapper.org/munkres/
+ */
 public class Hungarian {
-    private static final byte UNMARKED = 0;
-    private static final byte MARK_ROW = -1;
-    private static final byte MARK_COL = 1;
-    private static final byte MARK_BOTH = 2;
-
     private final boolean maximize;
+    private final boolean debug;
 
-    private double[][] originalValues;
-    private double[][] values;
-
-    private byte[][] lines;
-    private int lineCount;
-
-    private boolean[] markedRows;
-    private boolean[] markedCols;
-
-    private boolean[] occupiedCols;
-    private int[] rows;
+    private double[][] originalCost;
+    private double[][] cost;
+    private byte[][] mask;
 
     private int rowCount;
     private int size;
+    private int step;
 
-    public Hungarian(boolean maximize) {
-        this.maximize = maximize;
+    private int[] rowCover;
+    private int[] colCover;
+
+    private int row;
+    private int col;
+
+    private int pathRow0;
+    private int pathCol0;
+    private int pathCount;
+    private int[][] path;
+
+    /**
+     * Create new solver with minimization solution and debug off.
+     */
+    public Hungarian() {
+        this(false, false);
     }
 
+    /**
+     * Create new solver with given solution and debug off.
+     */
+    public Hungarian(boolean maximize) {
+        this(maximize, false);
+    }
+
+    /**
+     * Create new solver with given solution and debug.
+     */
+    public Hungarian(boolean maximize, boolean debug) {
+        this.maximize = maximize;
+        this.debug = debug;
+    }
+
+    /**
+     * Set required size of the matrix.
+     */
     public void setMatrixSize(int rows, int cols) {
         this.rowCount = rows;
         this.size = Math.max(rows, cols);
         ensureCapacity();
     }
 
+    /**
+     * Set value in given row and column.
+     */
     public void setCell(int row, int col, double value) {
-        originalValues[row][col] = value;
-        values[row][col] = maximize ? -value : value;
+        this.originalCost[row][col] = value;
+        this.cost[row][col] = maximize ? -value : value;
     }
 
-    public void reduce() {
-        subtractRowMin();
-        subtractColMin();
-
-        coverZeros();
-        while (lineCount != size) {
-            createAdditionalZeros();
-            coverZeros();
-        }
-
-        optimization();
-    }
-
+    /**
+     * Return an array of mapping of rows to columns where index is row and its
+     * value is the mapped column.
+     */
     public int[] getResult() {
-        return Arrays.copyOf(rows, rowCount);
+        int[] out = new int[rowCount];
+        for (int r = 0; r < rowCount; r++) {
+            for (int c = 0; c < size; c++) {
+                if (mask[r][c] == 1) {
+                    out[r] = c;
+                    break;
+                }
+            }
+        }
+        return out;
     }
 
-    public double maximumAverage() {
+    /**
+     * Return the optimal average (maximum or minimum based on the provided
+     * parameter maximize)
+     */
+    public double optimalAverage() {
         if (rowCount == 0) {
             return 0;
         }
 
-        double total = 0;
-        for (int row = 0; row < rowCount; row++) {
-            total += originalValues[row][rows[row]];
-        }
-
-        return total / rowCount;
-    }
-
-    private void subtractRowMin() {
-        for (int r = 0; r < size; r++) {
-            double min = Double.POSITIVE_INFINITY;
+        double sum = 0;
+        for (int r = 0; r < rowCount; r++) {
             for (int c = 0; c < size; c++) {
-                double val = values[r][c];
-                if (min > val) {
-                    min = val;
+                if (mask[r][c] == 1) {
+                    sum += originalCost[r][c];
+                    break;
                 }
             }
-            for (int c = 0; c < size; c++) {
-                values[r][c] -= min;
+        }
+
+        return sum / rowCount;
+    }
+
+    /**
+     * Solve the assignment.
+     */
+    public void reduce() {
+        boolean done = false;
+        step = 1;
+        while (!done) {
+            printCostMatrix();
+            printMaskMatrix();
+
+            switch (step) {
+                case 1:
+                    stepOne();
+                    break;
+                case 2:
+                    stepTwo();
+                    break;
+                case 3:
+                    stepThree();
+                    break;
+                case 4:
+                    stepFour();
+                    break;
+                case 5:
+                    stepFive();
+                    break;
+                case 6:
+                    stepSix();
+                    break;
+                default:
+                    done = true;
+                    break;
             }
         }
     }
 
-    private void subtractColMin() {
+    private void stepOne() {
+        for (int r = 0; r < size; r++) {
+            double minValue = Double.POSITIVE_INFINITY;
+            for (int c = 0; c < size; c++) {
+                if (minValue > cost[r][c]) {
+                    minValue = cost[r][c];
+                }
+            }
+
+            for (int c = 0; c < size; c++) {
+                cost[r][c] -= minValue;
+            }
+        }
+
+        step = 2;
+    }
+
+    private void stepTwo() {
+        for (int r = 0; r < size; r++) {
+            for (int c = 0; c < size; c++) {
+                if (cost[r][c] == 0 && rowCover[r] == 0 && colCover[c] == 0) {
+                    mask[r][c] = 1;
+                    rowCover[r] = 1;
+                    colCover[c] = 1;
+                }
+            }
+        }
+
+        clearCovers();
+        step = 3;
+    }
+
+    private void stepThree() {
+        int colCount = 0;
+        for (int r = 0; r < size; r++) {
+            for (int c = 0; c < size; c++) {
+                if (mask[r][c] == 1 && colCover[c] == 0) {
+                    colCover[c] = 1;
+                    colCount++;
+                }
+            }
+        }
+
+        if (colCount >= size) {
+            step = 7;
+        } else {
+            step = 4;
+        }
+    }
+
+    private void stepFour() {
+        boolean done = false;
+
+        while (!done) {
+            findAZero();
+            if (row < 0) {
+                done = true;
+                step = 6;
+            } else {
+                mask[row][col] = 2;
+                if (findStarInRow(row)) {
+                    rowCover[row] = 1;
+                    colCover[col] = 0;
+                } else {
+                    done = true;
+                    step = 5;
+                    pathRow0 = row;
+                    pathCol0 = col;
+                }
+            }
+        }
+    }
+
+    private void stepFive() {
+        boolean done = false;
+        row = -1;
+        col = -1;
+
+        pathCount = 0;
+        path[pathCount][0] = pathRow0;
+        path[pathCount][1] = pathCol0;
+
+        while (!done) {
+            findStarInCol(path[pathCount][1]);
+            if (row >= 0) {
+                pathCount++;
+                path[pathCount][0] = row;
+                path[pathCount][1] = path[pathCount - 1][1];
+            } else {
+                done = true;
+            }
+            if (!done) {
+                findPrimeInRow(path[pathCount - 1][0]);
+                pathCount++;
+                path[pathCount][0] = path[pathCount - 1][0];
+                path[pathCount][1] = col;
+            }
+        }
+        augmentPaths();
+        clearCovers();
+        erasePrimes();
+        step = 3;
+    }
+
+    private void stepSix() {
+        double minVal = findSmallest();
+        for (int r = 0; r < size; r++) {
+            for (int c = 0; c < size; c++) {
+                if (rowCover[r] == 1) {
+                    cost[r][c] += minVal;
+                }
+
+                if (colCover[c] == 0) {
+                    cost[r][c] -= minVal;
+                }
+            }
+        }
+        step = 4;
+    }
+
+    private void findAZero() {
+        row = -1;
+        col = -1;
+
+        for (int r = 0; r < size; r++) {
+            for (int c = 0; c < size; c++) {
+                if (cost[r][c] == 0 && rowCover[r] == 0 && colCover[c] == 0) {
+                    row = r;
+                    col = c;
+                    return;
+                }
+            }
+        }
+    }
+
+    private boolean findStarInRow(int row) {
         for (int c = 0; c < size; c++) {
-            double min = Double.POSITIVE_INFINITY;
-            for (int r = 0; r < size; r++) {
-                double val = values[r][c];
-                if (min > val) {
-                    min = val;
-                }
-            }
-            for (int r = 0; r < size; r++) {
-                values[r][c] -= min;
+            if (mask[row][c] == 1) {
+                col = c;
+                return true;
             }
         }
-    }
-
-    private void coverZeros() {
-        tryAssignment();
-
-        Arrays.fill(markedRows, 0, size, false);
-        Arrays.fill(markedCols, 0, size, false);
-        clear(lines);
-
-        // System.out.println("Initially values:");
-        // printValues();
-
-        // System.out.println("Initially lines:");
-        // printLines();
-
-        for (int r = 0; r < size; r++) {
-            if (rows[r] == -1) {
-                markRow(r);
-            }
-        }
-
-        lineCount = invertRowMarks();
-
-        // System.out.println("Invert lines:");
-        // printLines();
-    }
-
-    private void tryAssignment() {
-        Arrays.fill(rows, 0, size, -1);
-        Arrays.fill(occupiedCols, 0, size, false);
-
-        int limit = 0;
-        int count = 0;
-        while (count < size && limit < size) {
-            limit++;
-            for (int row = 0; row < size; row++) {
-                if (rows[row] != -1) {
-                    continue;
-                }
-
-                int lastCol = -1;
-                int zeros = 0;
-                for (int col = 0; col < size; col++) {
-                    if (values[row][col] == 0 && !occupiedCols[col]) {
-                        zeros++;
-                        if (zeros > limit) {
-                            break;
-                        }
-                        lastCol = col;
-                    }
-                }
-
-                if (lastCol != -1 && zeros <= limit) {
-                    rows[row] = lastCol;
-                    occupiedCols[lastCol] = true;
-                    count++;
-                }
-            }
-
-            for (int col = 0; col < size; col++) {
-                if (occupiedCols[col]) {
-                    continue;
-                }
-
-                int lastRow = -1;
-                int zeros = 0;
-                for (int row = 0; row < size; row++) {
-                    if (values[row][col] == 0 && rows[row] == -1) {
-                        zeros++;
-                        if (zeros > limit) {
-                            break;
-                        }
-                        lastRow = row;
-                    }
-                }
-
-                if (lastRow != -1 && zeros <= limit) {
-                    rows[lastRow] = col;
-                    occupiedCols[col] = true;
-                    count++;
-                }
-            }
-        }
-    }
-
-    private void markRow(int row) {
-        if (markedRows[row]) {
-            return;
-        }
-
-        markedRows[row] = true;
-
-        for (int col = 0; col < size; col++) {
-            byte mark = lines[row][col];
-            if (mark == MARK_COL || mark == MARK_BOTH) {
-                lines[row][col] = MARK_BOTH;
-            } else {
-                lines[row][col] = MARK_ROW;
-            }
-        }
-
-        // System.out.println("Marking row: " + row);
-        // printLines();
-
-        for (int col = 0; col < size; col++) {
-            if (values[row][col] == 0) {
-                markColumn(col);
-            }
-        }
-    }
-
-    private void markColumn(int col) {
-        if (markedCols[col]) {
-            return;
-        }
-
-        markedCols[col] = true;
-
-        for (int row = 0; row < size; row++) {
-            byte mark = lines[row][col];
-            if (mark == MARK_ROW || mark == MARK_BOTH) {
-                lines[row][col] = MARK_BOTH;
-            } else {
-                lines[row][col] = MARK_COL;
-            }
-        }
-
-        // System.out.println("Marking column: " + col);
-        // printLines();
-
-        for (int row = 0; row < size; row++) {
-            if (rows[row] == col) {
-                markRow(row);
-            }
-        }
-    }
-
-    private int invertRowMarks() {
-        int count = 0;
-        for (int row = 0; row < size; row++) {
-            for (int col = 0; col < size; col++) {
-                byte mark = lines[row][col];
-                switch (mark) {
-                    case UNMARKED:
-                        lines[row][col] = MARK_ROW;
-                        break;
-                    case MARK_ROW:
-                        lines[row][col] = UNMARKED;
-                        break;
-                    case MARK_COL:
-                        lines[row][col] = MARK_BOTH;
-                        break;
-                    case MARK_BOTH:
-                        lines[row][col] = MARK_COL;
-                        break;
-                    default:
-                        break;
-                }
-                if (row == col) {
-                    count += Math.abs(lines[row][col]);
-                }
-            }
-        }
-        return count;
-    }
-
-    private void createAdditionalZeros() { // NOSONAR
-        double minUncoveredVal = Double.POSITIVE_INFINITY;
-        for (int row = 0; row < size; row++) {
-            for (int col = 0; col < size; col++) {
-                if (lines[row][col] != UNMARKED) {
-                    continue;
-                }
-
-                double val = values[row][col];
-                if (minUncoveredVal > val) {
-                    minUncoveredVal = val;
-                }
-            }
-        }
-
-        for (int row = 0; row < size; row++) {
-            for (int col = 0; col < size; col++) {
-                byte mark = lines[row][col];
-                if (mark == UNMARKED) {
-                    values[row][col] -= minUncoveredVal;
-                } else if (mark == MARK_BOTH) {
-                    values[row][col] += minUncoveredVal;
-                }
-            }
-        }
-    }
-
-    private void optimization() {
-        Arrays.fill(rows, 0, size, -1);
-        Arrays.fill(occupiedCols, 0, size, false);
-        optimization(0);
-    }
-
-    private boolean optimization(int row) {
-        if (row >= size) {
-            return true;
-        }
-
-        for (int col = 0; col < size; col++) {
-            if (values[row][col] == 0 && !occupiedCols[col]) {
-                rows[row] = col;
-                occupiedCols[col] = true;
-
-                if (optimization(row + 1)) {
-                    return true;
-                }
-
-                // Didn't pan out. Revert the assignment
-                rows[row] = -1;
-                occupiedCols[col] = false;
-            }
-        }
-
         return false;
     }
 
+    private void findStarInCol(int col) {
+        row = -1;
+        for (int r = 0; r < size; r++) {
+            if (mask[r][col] == 1) {
+                row = r;
+                break;
+            }
+        }
+    }
+
+    private void findPrimeInRow(int row) {
+        col = -1;
+        for (int c = 0; c < size; c++) {
+            if (mask[row][c] == 2) {
+                col = c;
+                break;
+            }
+        }
+    }
+
+    private void augmentPaths() {
+        for (int i = 0; i <= pathCount; i++) {
+            int r = path[i][0];
+            int c = path[i][1];
+
+            if (mask[r][c] == 1) {
+                mask[r][c] = 0;
+            } else {
+                mask[r][c] = 1;
+            }
+        }
+    }
+
+    private void clearCovers() {
+        Arrays.fill(rowCover, 0, size, 0);
+        Arrays.fill(colCover, 0, size, 0);
+    }
+
+    private void erasePrimes() {
+        for (int r = 0; r < size; r++) {
+            for (int c = 0; c < size; c++) {
+                if (mask[r][c] == 2) {
+                    mask[r][c] = 0;
+                }
+            }
+        }
+    }
+
+    private double findSmallest() {
+        double minVal = Double.POSITIVE_INFINITY;
+        for (int r = 0; r < size; r++) {
+            for (int c = 0; c < size; c++) {
+                if (rowCover[r] == 0 && colCover[c] == 0 && minVal > cost[r][c]) {
+                    minVal = cost[r][c];
+                }
+            }
+        }
+        return minVal;
+    }
+
+    private void printCostMatrix() {
+        if (!debug) {
+            return;
+        }
+
+        for (int r = 0; r < size; r++) {
+            for (int c = 0; c < size; c++) {
+                System.out.printf(" % 1.3f |", cost[r][c]);
+            }
+            System.out.println();
+        }
+    }
+
+    private void printMaskMatrix() {
+        if (!debug) {
+            return;
+        }
+
+        for (int r = 0; r < size; r++) {
+            for (int c = 0; c < size; c++) {
+                System.out.printf(" %2d |", mask[r][c]);
+            }
+            System.out.println();
+        }
+    }
+
     private void ensureCapacity() {
-        if (originalValues == null || originalValues.length < size) {
-            int oldLength = originalValues == null ? 0 : originalValues.length;
+        if (cost == null || cost.length < size) {
+            int oldLength = cost == null ? 0 : cost.length;
             int newLength = Math.max(size, oldLength * 2);
 
-            originalValues = new double[newLength][newLength];
-            values = new double[newLength][newLength];
-            lines = new byte[newLength][newLength];
-            markedRows = new boolean[newLength];
-            markedCols = new boolean[newLength];
-            occupiedCols = new boolean[newLength];
-            rows = new int[newLength];
+            originalCost = new double[newLength][newLength];
+            cost = new double[newLength][newLength];
+            mask = new byte[newLength][newLength];
+            rowCover = new int[newLength];
+            colCover = new int[newLength];
+            path = new int[newLength * newLength][2];
         } else {
-            clear(originalValues);
-            clear(values);
+            clear(originalCost);
+            clear(cost);
+            clear(mask);
+            clear(path);
+            clear(rowCover);
+            clear(colCover);
+        }
+    }
+
+    private void clear(int[][] arr) {
+        for (int r = 0; r < size; r++) {
+            for (int c = 0; c < size; c++) {
+                arr[r][c] = 0;
+            }
         }
     }
 
@@ -354,23 +424,9 @@ public class Hungarian {
         }
     }
 
-    // private void printLines() {
-    // for (int row = 0; row < size; row++) {
-    // for (int col = 0; col < size; col++) {
-    // System.out.printf("% 1d | ", lines[row][col]);
-    // }
-    // System.out.println();
-    // }
-    // System.out.println();
-    // }
-
-    // private void printValues() {
-    // for (int row = 0; row < size; row++) {
-    // for (int col = 0; col < size; col++) {
-    // System.out.printf("% 1.3f | ", values[row][col]);
-    // }
-    // System.out.println();
-    // }
-    // System.out.println();
-    // }
+    private void clear(int[] arr) {
+        for (int i = 0; i < size; i++) {
+            arr[i] = 0;
+        }
+    }
 }

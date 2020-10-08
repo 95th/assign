@@ -37,14 +37,14 @@ class HungarianTest {
     @Test
     void test_03() {
         double[][] matrix = { { 0, 0, 0 }, { 1, 0, 0 }, { 1, 0, 0 } };
-        int[] expected = { 1, 0, 2 };
+        int[] expected = { 2, 1, 0 };
         run_test(3, 3, matrix, expected);
     }
 
     @Test
     void test_04() {
         double[][] matrix = { { 0, 0, 0, 0, 0, 0 }, { 0.42, 0, 0, 0, 0, 0 }, { 0.41, 0, 0, 0, 0, 0 } };
-        int[] expected = { 1, 0, 2 };
+        int[] expected = { 5, 0, 1 };
         run_test(3, 6, matrix, expected);
     }
 
@@ -64,7 +64,7 @@ class HungarianTest {
 
     @Test
     void test_07() {
-        double[][] matrix = { { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 1, 2 }, { 0, 0, 3, 4 } };
+        double[][] matrix = { { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 1, 2 }, { 0, 0, 3, 5 } };
         int[] expected = { 0, 1, 2, 3 };
         run_test(4, 4, matrix, expected);
     }
