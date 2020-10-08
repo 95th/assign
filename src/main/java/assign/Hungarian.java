@@ -358,12 +358,14 @@ public class Hungarian {
             return;
         }
 
+        System.out.println("Cost matrix: ");
         for (int r = 0; r < size; r++) {
             for (int c = 0; c < size; c++) {
                 System.out.printf(" % 1.3f |", cost[r][c]);
             }
             System.out.println();
         }
+        System.out.println();
     }
 
     private void printMaskMatrix() {
@@ -371,12 +373,14 @@ public class Hungarian {
             return;
         }
 
+        System.out.println("Mask matrix: ");
         for (int r = 0; r < size; r++) {
             for (int c = 0; c < size; c++) {
                 System.out.printf(" %2d |", mask[r][c]);
             }
             System.out.println();
         }
+        System.out.println();
     }
 
     private void ensureCapacity() {
